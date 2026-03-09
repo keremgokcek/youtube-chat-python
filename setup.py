@@ -7,6 +7,6 @@ setup(
     author='keremgokcek',
     author_email='keremgokcek@teteos.net',
     description='Library for fetching YouTube livestream chat',
-    packages=['youtube_chat'],
+    packages=['youtube_chat', 'youtube_chat.types'],
     install_requires=['aiohttp'],
 )

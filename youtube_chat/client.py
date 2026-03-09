@@ -2,6 +2,7 @@ from asyncio import sleep, create_task
 from aiohttp import ClientSession
 from .request import fetch_live_page, fetch_chat
 from .youtube_types import TextMessage
+from .types.cookie import Cookie
 from typing import TYPE_CHECKING, Callable, Optional, Union
 from time import time
 
@@ -13,8 +14,10 @@ MAX_RETRY_ATTEMPTS = 3
 
 
 class Client:
-    def __init__(self, live_url: str):
+    def __init__(self, live_url: str, cookies: Cookie | None = None):
         self.live_url: str = live_url
+        self.cookies: Cookie = cookies
+
         self.options: 'RequestOptions' = None
         self.session: ClientSession
         self.running: bool = False
@@ -29,7 +32,9 @@ class Client:
         self.retry_attempts: int = 0
 
     async def start(self, ignore_first: bool = True):
-        self.session = ClientSession()
+        cookie_jar = self.cookies and await self.cookies._load_cookies()
+
+        self.session = ClientSession(cookie_jar=cookie_jar)
         self.options, live_id, channel_id = await fetch_live_page(
             self.live_url, self.session
         )
