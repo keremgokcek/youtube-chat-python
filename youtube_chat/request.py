@@ -17,19 +17,19 @@ class RequestOptions:
 
 async def fetch_live_page(
     url: str, session: ClientSession
-) -> tuple[RequestOptions, str, str]:
+) -> tuple[RequestOptions, str, str] | None:
     async with session.get(url) as response:
         return get_options_from_live_page(await response.text())
 
 
-def get_options_from_live_page(data: str) -> tuple[RequestOptions, str]:
+def get_options_from_live_page(data: str) -> tuple[RequestOptions, str] | None:
     live_id_regex = re.compile(
         r'<link rel="canonical" href="https://www.youtube.com/watch\?v=(.+?)">'
     )
     if match_object := live_id_regex.search(data):
         live_id = match_object.group(1)
     else:
-        raise ValueError('Live stream was not found')
+        return None
 
     channel_id_regex = re.compile(r'"channelId":"([A-Za-z0-9_]{24})"')
     if match_object := channel_id_regex.search(data):

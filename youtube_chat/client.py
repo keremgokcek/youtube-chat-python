@@ -1,4 +1,4 @@
-from asyncio import sleep, create_task
+from asyncio import sleep, create_task, run
 from aiohttp import ClientSession
 from .request import fetch_live_page, fetch_chat
 from .youtube_types import TextMessage
@@ -24,6 +24,7 @@ class Client:
 
         self.on_ready: list[Callable] = []
         self.on_message: list[Callable] = []
+        self.on_stream_end: list[Callable] = []
         self.commands: dict[str, dict] = {}
         self.cooldowns: dict[str, Union[dict[str, float], float]] = {}
 
@@ -31,13 +32,42 @@ class Client:
         self.channel_id: str | None
         self.retry_attempts: int = 0
 
-    async def start(self, ignore_first: bool = True):
+    def run(
+        self, ignore_first: bool = True, wait_for_streams: bool = True
+    ) -> None:
+        async def main():
+            if wait_for_streams:
+                while True:
+                    await self.start(
+                        ignore_first=ignore_first,
+                        wait_for_streams=wait_for_streams,
+                    )
+                    await sleep(30)
+            else:
+                await self.start(
+                    ignore_first=ignore_first,
+                    wait_for_streams=wait_for_streams,
+                )
+
+        run(main())
+
+    async def start(
+        self, ignore_first: bool = True, wait_for_streams: bool = True
+    ):
         cookie_jar = self.cookies and await self.cookies._load_cookies()
 
         self.session = ClientSession(cookie_jar=cookie_jar)
-        self.options, live_id, channel_id = await fetch_live_page(
-            self.live_url, self.session
-        )
+
+        live_page_data = await fetch_live_page(self.live_url, self.session)
+        while wait_for_streams and not live_page_data:
+            await sleep(30)
+            live_page_data = await fetch_live_page(self.live_url, self.session)
+
+        if not live_page_data:
+            print('Livestream was not found.')
+            return
+
+        self.options, live_id, channel_id = live_page_data
 
         self.running = True
         self.live_id = live_id
@@ -61,7 +91,9 @@ class Client:
 
                 if self.retry_attempts >= MAX_RETRY_ATTEMPTS:
                     self.running = False
-                    print(str(e))
+
+                    for on_stream_end in self.on_stream_end:
+                        create_task(on_stream_end())
 
             await sleep(1)
 
@@ -125,6 +157,8 @@ class Client:
                 self.on_ready.append(func)
             case "on_message":
                 self.on_message.append(func)
+            case "on_stream_end":
+                self.on_stream_end.append(func)
 
         return func
 
