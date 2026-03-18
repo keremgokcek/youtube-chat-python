@@ -5,12 +5,15 @@ from typing import Self
 class Cookie:
     def __init__(self, cookie_dict: dict[str, str]) -> None:
         self._cookie_dict: dict[str, str] = cookie_dict
-        self._cookie_jar: CookieJar
+        self._cookie_jar: CookieJar | None
 
     async def _load_cookies(self) -> CookieJar:
         self._cookie_jar = CookieJar()
         self._cookie_jar.update_cookies(self._cookie_dict)
         return self._cookie_jar
+
+    async def get_cookies(self) -> CookieJar:
+        return self._cookie_jar or await self._load_cookies()
 
     @classmethod
     def from_file(cls, cookie_file: str) -> Self:
