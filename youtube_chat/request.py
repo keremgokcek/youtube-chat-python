@@ -50,7 +50,7 @@ def get_options_from_live_page(data: str) -> tuple[RequestOptions, str] | None:
         raise ValueError('API key was not found')
 
     client_version_regex = re.compile(
-        r'''['"]clientVersion['"]:\s*['"]([\d.]+?)['"]'''
+        r'''['"]clientVersion['"]:\s*['"](.+?)['"]'''
     )
     if match_object := client_version_regex.search(data):
         client_version = match_object.group(1)
