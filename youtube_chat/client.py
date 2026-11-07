@@ -59,13 +59,29 @@ class Client:
         self.session = ClientSession(cookie_jar=cookie_jar)
 
         live_page_data = await fetch_live_page(self.live_url, self.session)
-        while wait_for_streams and not live_page_data:
-            await sleep(30)
-            live_page_data = await fetch_live_page(self.live_url, self.session)
 
-        if not live_page_data:
+        if not wait_for_streams and not live_page_data:
             print('Livestream was not found.')
+            await self.session.close()
             return
+
+        while not live_page_data:
+            await sleep(30)
+
+            try:
+                live_page_data = await fetch_live_page(
+                    self.live_url, self.session
+                )
+                self.retry_attempts = 0
+            except Exception:
+                self.retry_attempts += 1
+                print(
+                    f'Failed to fetch live page, retrying... ({self.retry_attempts}/{MAX_RETRY_ATTEMPTS})'
+                )
+
+                if self.retry_attempts >= MAX_RETRY_ATTEMPTS:
+                    await self.session.close()
+                    raise
 
         self.options, live_id, channel_id = live_page_data
 
