@@ -36,33 +36,37 @@ class Client:
         self, ignore_first: bool = True, wait_for_streams: bool = True
     ) -> None:
         async def main():
-            if wait_for_streams:
-                while True:
-                    await self.start(
-                        ignore_first=ignore_first,
-                        wait_for_streams=wait_for_streams,
-                    )
-                    await sleep(30)
-            else:
+            cookie_jar = self.cookies and await self.cookies._load_cookies()
+            self.session = ClientSession(cookie_jar=cookie_jar)
+
+            try:
                 await self.start(
                     ignore_first=ignore_first,
                     wait_for_streams=wait_for_streams,
                 )
+                if wait_for_streams:
+                    while True:
+                        await sleep(30)
+                        await self.start(
+                            ignore_first=ignore_first,
+                            wait_for_streams=wait_for_streams,
+                        )
 
-        run(main())
+            finally:
+                await self.session.close()
+
+        try:
+            run(main())
+        except KeyboardInterrupt:
+            print("\nShutting down the client.")
 
     async def start(
         self, ignore_first: bool = True, wait_for_streams: bool = True
     ):
-        cookie_jar = self.cookies and await self.cookies._load_cookies()
-
-        self.session = ClientSession(cookie_jar=cookie_jar)
-
         live_page_data = await fetch_live_page(self.live_url, self.session)
 
         if not wait_for_streams and not live_page_data:
             print('Livestream was not found.')
-            await self.session.close()
             return
 
         while not live_page_data:
@@ -80,7 +84,6 @@ class Client:
                 )
 
                 if self.retry_attempts >= MAX_RETRY_ATTEMPTS:
-                    await self.session.close()
                     raise
 
         self.options, live_id, channel_id = live_page_data
@@ -112,8 +115,6 @@ class Client:
                         create_task(on_stream_end())
 
             await sleep(1)
-
-        await self.session.close()
 
     async def execute(self, emit: bool = True):
         if not self.options:
